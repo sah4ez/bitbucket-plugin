@@ -28,6 +28,8 @@ import com.google.common.base.Objects;
 
 public class BitbucketJobProbe {
 
+    public static final String RONTE_JOB_NAME = "platoon-backend-multijob";
+
     @Deprecated
     public void triggerMatchingJobs(String user, String url, String scm) {
         triggerMatchingJobs(user, url, scm, "");
@@ -37,36 +39,27 @@ public class BitbucketJobProbe {
         if ("git".equals(scm) || "hg".equals(scm)) {
             SecurityContext old = Jenkins.getInstance().getACL().impersonate(ACL.SYSTEM);
             try {
-                URIish remote = new URIish(url);
-                for (Job<?,?> job : Jenkins.getInstance().getAllItems(Job.class)) {
-                    BitBucketTrigger bTrigger = null;
-                    LOGGER.log(Level.FINE, "Considering candidate job {0}", job.getName());
+                BitBucketTrigger bTrigger = null;
+                Job job = Jenkins.getInstance().getItemByFullName(RONTE_JOB_NAME, Job.class);
+                if (job instanceof ParameterizedJobMixIn.ParameterizedJob) {
+                    ParameterizedJobMixIn.ParameterizedJob pJob = (ParameterizedJobMixIn.ParameterizedJob) job;
+                    for (Trigger trigger : pJob.getTriggers().values()) {
 
-                    if (job instanceof ParameterizedJobMixIn.ParameterizedJob) {
-                        ParameterizedJobMixIn.ParameterizedJob pJob = (ParameterizedJobMixIn.ParameterizedJob) job;
-                        for (Trigger trigger : pJob.getTriggers().values()) {
-                            if (trigger instanceof BitBucketTrigger) {
-                                bTrigger = (BitBucketTrigger) trigger;
-                                break;
-                            }
+                        if (trigger instanceof BitBucketTrigger) {
+                            bTrigger = (BitBucketTrigger) trigger;
+                            break;
                         }
                     }
-                    if (bTrigger != null) {
-                        LOGGER.log(Level.FINE, "Considering to poke {0}", job.getFullDisplayName());
-                        SCMTriggerItem item = SCMTriggerItem.SCMTriggerItems.asSCMTriggerItem(job);
-                        List<SCM> scmTriggered = new ArrayList<SCM>();
-                        for (SCM scmTrigger : item.getSCMs()) {
-                            if (match(scmTrigger, remote) && !hasBeenTriggered(scmTriggered, scmTrigger)) {
-                                LOGGER.log(Level.INFO, "Triggering BitBucket job {0}", job.getName());
-                                scmTriggered.add(scmTrigger);
-                                bTrigger.onPost(user, payload);
-                            } else LOGGER.log(Level.FINE, "{0} SCM doesn't match remote repo {1}", new Object[]{job.getName(), remote});
-                        }
-                    } else
-                        LOGGER.log(Level.FINE, "{0} hasn't BitBucketTrigger set", job.getName());
                 }
-            } catch (URISyntaxException e) {
-                LOGGER.log(Level.WARNING, "Invalid repository URL {0}", url);
+
+                if (bTrigger != null) {
+                    LOGGER.log(Level.INFO, "Considering to poke {0}", job.getFullDisplayName());
+                    bTrigger.onPost(user, payload);
+                } else {
+                    LOGGER.log(Level.INFO, "{0} hasn't BitBucketTrigger set", job.getName());
+                }
+            }catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "{0} hasn't BitBucketTrigger set", e.getCause());
             } finally {
                 SecurityContextHolder.setContext(old);
             }
@@ -90,15 +83,15 @@ public class BitbucketJobProbe {
             for (RemoteConfig remoteConfig : ((GitSCM) scm).getRepositories()) {
                 for (URIish urIish : remoteConfig.getURIs()) {
                     // needed cause the ssh and https URI differs in Bitbucket Server.
-                    if(urIish.getPath().startsWith("/scm")){
+                    if (urIish.getPath().startsWith("/scm")) {
                         urIish = urIish.setPath(urIish.getPath().substring(4));
                     }
-                    
+
                     // needed because bitbucket self hosted does not transfer any host information
                     if (StringUtils.isEmpty(url.getHost())) {
-                    	urIish = urIish.setHost(url.getHost());
+                        urIish = urIish.setHost(url.getHost());
                     }
-                    
+
                     LOGGER.log(Level.FINE, "Trying to match {0} ", urIish.toString() + "<-->" + url.toString());
                     if (GitStatus.looselyMatches(urIish, url)) {
                         return true;
@@ -124,8 +117,8 @@ public class BitbucketJobProbe {
         try {
             URI repositoryUri = new URI(repository);
             result = Objects.equal(notifyUri.getHost(), repositoryUri.getHost())
-            && Objects.equal(notifyUri.getPath(), repositoryUri.getPath())
-            && Objects.equal(notifyUri.getQuery(), repositoryUri.getQuery());
+                    && Objects.equal(notifyUri.getPath(), repositoryUri.getPath())
+                    && Objects.equal(notifyUri.getQuery(), repositoryUri.getQuery());
         } catch (URISyntaxException ex) {
             LOGGER.log(Level.SEVERE, "Could not parse repository uri: {0}, {1}", new Object[]{repository, ex});
         }

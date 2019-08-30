@@ -4,6 +4,7 @@ import hudson.EnvVars;
 import hudson.model.AbstractBuild;
 import hudson.model.EnvironmentContributingAction;
 import hudson.model.InvisibleAction;
+import net.sf.json.JSONObject;
 
 import javax.annotation.Nonnull;
 import java.util.logging.Level;
@@ -31,6 +32,34 @@ public class BitBucketPayload extends InvisibleAction implements EnvironmentCont
         final String payload = getPayload();
         LOGGER.log(Level.FINEST, "Injecting BITBUCKET_PAYLOAD: {0}", payload);
         envVars.put("BITBUCKET_PAYLOAD", payload);
+//
+//        JSONObject JSONPayload = JSONObject.fromObject(payload);
+//        if (JSONPayload.has("repository")) {
+//            envVars.put("REPOSITORY", JSONPayload.getJSONObject("repository").getString("name"));
+//        }
+//        if (JSONPayload.has("actor")) {
+//            envVars.put("AUTHOR", JSONPayload.getJSONObject("actor").getString("nickname"));
+//        }
+//        if (JSONPayload.has("push")) {
+//            for (Object changes : JSONPayload.getJSONArray("changes")) {
+//                if (changes instanceof JSONObject) {
+//                    JSONObject item = (JSONObject) changes;
+//                    if (item.has("new")) {
+//                        envVars.put("BRANCH", item.getJSONObject("new").getString("name"));
+//                    }
+//                }
+//
+//            }
+//        }
+//        if (JSONPayload.has("pullrequest")) {
+//            if (JSONPayload.getJSONObject("pullrequest").getString("state") == "MERGED") {
+//                envVars.put("BRANCH", JSONPayload
+//                                .getJSONObject("pullrequest")
+//                                .getJSONObject("destination")
+//                                .getJSONObject("branch")
+//                                .getString("name"));
+//            }
+//        }
     }
 
     private static final Logger LOGGER = Logger.getLogger(BitBucketPayload.class.getName());

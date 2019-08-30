@@ -181,7 +181,7 @@ public class BitBucketTrigger extends Trigger<Job<?, ?>> {
 
         @Override
         public String getDisplayName() {
-            return "Build when a change is pushed to BitBucket";
+            return "Ronte Bitbucket trigger for build from multirepo by Bitbucket push";
         }
     }
 

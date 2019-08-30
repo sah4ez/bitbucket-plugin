@@ -20,7 +20,7 @@ public class CrumbExclusionTest {
     @Test
     public void shouldNotRequireACrumbForTheBitbucketHookUrl() throws IOException, SAXException {
         JenkinsRule.WebClient webClient = jenkins.createWebClient();
-        WebRequest wrs = new WebRequest(new URL(webClient.getContextPath() + "bitbucket-hook"),
+        WebRequest wrs = new WebRequest(new URL(webClient.getContextPath() + "ronte-bitbucket-hook"),
                 HttpMethod.POST);
         WebResponse resp = webClient.getPage(wrs).getWebResponse();
 

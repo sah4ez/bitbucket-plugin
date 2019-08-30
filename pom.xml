@@ -7,11 +7,11 @@
         <version>2.7</version>
     </parent>
 
-    <artifactId>bitbucket</artifactId>
-    <version>1.1.12-SNAPSHOT</version>
+    <artifactId>ronte-bitbucket</artifactId>
+    <version>1.3.1</version>
     <packaging>hpi</packaging>
-    <name>Jenkins Bitbucket Plugin</name>
-    <description>integrate Jenkins with BitBucket.</description>
+    <name>Ronte Jenkins Bitbucket Plugin</name>
+    <description>integrate Jenkins with BitBucket for Ronte.io.</description>
     <url>https://wiki.jenkins-ci.org/display/JENKINS/BitBucket+Plugin</url>
 
     <scm>
