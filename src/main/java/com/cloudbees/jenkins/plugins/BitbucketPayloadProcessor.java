@@ -2,17 +2,22 @@ package com.cloudbees.jenkins.plugins;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.servlet.http.HttpServletRequest;
 
+import hudson.model.queue.QueueTaskFuture;
 import net.sf.json.JSONException;
 import net.sf.json.JSONObject;
 
 public class BitbucketPayloadProcessor {
 
     private final BitbucketJobProbe probe;
+
+    public static QueueTaskFuture currentTask;
+
 
     public BitbucketPayloadProcessor(BitbucketJobProbe probe) {
         this.probe = probe;
@@ -70,11 +75,21 @@ public class BitbucketPayloadProcessor {
 
         // always use git no other repo type supported on self hosted solution
         String scm = "git";
-        probe.triggerMatchingJobs(user, url, scm, payload.toString());
+        probe.triggerMatchingJob(user, url, scm, payload.toString());
 		
 	}
 
 	private void processWebhookPayload(JSONObject payload) {
+        if (currentTask != null) {
+            while (currentTask.getStartCondition().isDone()){
+                try {
+                    Thread.sleep(currentTask.waitForStart().getEstimatedDuration());
+                } catch (InterruptedException | ExecutionException e) {
+                    e.printStackTrace();
+                }
+            }
+            currentTask = null;
+        }
         if (payload.has("repository")) {
             JSONObject repo = payload.getJSONObject("repository");
             LOGGER.log(Level.INFO, "Received commit hook notification for {0}", repo);
@@ -83,14 +98,14 @@ public class BitbucketPayloadProcessor {
             String url = repo.getJSONObject("links").getJSONObject("html").getString("href");
             String scm = repo.has("scm") ? repo.getString("scm") : "git";
 
-            probe.triggerMatchingJobs(user, url, scm, payload.toString());
+            currentTask = probe.triggerMatchingJob(user, url, scm, payload.toString());
         } else if (payload.has("scm")) {
             LOGGER.log(Level.INFO, "Received commit hook notification for hg: {0}", payload);
             String user = getUser(payload, "owner");
             String url = payload.getJSONObject("links").getJSONObject("html").getString("href");
             String scm = payload.has("scm") ? payload.getString("scm") : "hg";
 
-            probe.triggerMatchingJobs(user, url, scm, payload.toString());
+            probe.triggerMatchingJob(user, url, scm, payload.toString());
         }
 
     }
@@ -125,7 +140,7 @@ public class BitbucketPayloadProcessor {
                 URL pushHref = new URL(repo.getJSONObject("links").getJSONArray("self").getJSONObject(0).getString("href"));
                 url = pushHref.toString().replaceFirst(new String("projects.*"), new String(repo.getString("fullName").toLowerCase()));
                 String scm = repo.has("scmId") ? repo.getString("scmId") : "git";
-                probe.triggerMatchingJobs(user, url, scm, payload.toString());
+                probe.triggerMatchingJob(user, url, scm, payload.toString());
             } catch (MalformedURLException e) {
                 LOGGER.log(Level.WARNING, String.format("URL %s is malformed", url), e);
             }
@@ -179,7 +194,7 @@ public class BitbucketPayloadProcessor {
         String url = payload.getString("canon_url") + repo.getString("absolute_url");
         String scm = repo.getString("scm");
 
-        probe.triggerMatchingJobs(user, url, scm, payload.toString());
+        probe.triggerMatchingJob(user, url, scm, payload.toString());
     }
 
     private static final Logger LOGGER = Logger.getLogger(BitbucketPayloadProcessor.class.getName());

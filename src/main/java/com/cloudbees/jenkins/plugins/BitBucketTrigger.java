@@ -14,7 +14,6 @@ import jenkins.triggers.SCMTriggerItem;
 import org.apache.commons.jelly.XMLOutput;
 import org.jenkinsci.Symbol;
 import org.kohsuke.stapler.DataBoundConstructor;
-import sun.awt.windows.ThemeReader;
 
 import java.io.File;
 import java.io.IOException;
@@ -24,11 +23,7 @@ import java.text.DateFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.locks.StampedLock;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,10 +32,11 @@ import java.util.logging.Logger;
  */
 public class BitBucketTrigger extends Trigger<Job<?, ?>> {
 
-    private transient final static ReentrantLock lock = new ReentrantLock();
+
 
     @DataBoundConstructor
     public BitBucketTrigger() {
+
     }
 
     /**
@@ -54,79 +50,46 @@ public class BitBucketTrigger extends Trigger<Job<?, ?>> {
     /**
      * Called when a POST is made.
      */
-    public void onPost(String triggeredByUser, final String payload) {
+    public QueueTaskFuture onPost(String triggeredByUser, final String payload) {
         final String pushBy = triggeredByUser;
-        while (getDescriptor().queue.getInProgress().size() > 0){
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
+        AtomicReference<QueueTaskFuture> currentTask = new AtomicReference<>();
 
-        getDescriptor().queue.execute(new Runnable() {
-            private boolean runPolling() {
+        getDescriptor().queue.execute(() -> {
+            try (StreamTaskListener listener = new StreamTaskListener(getLogFile())) {
+
+                long start = System.currentTimeMillis();
+                PrintStream logger = listener.getLogger();
+                logger.println("Started on " + DateFormat.getDateTimeInstance().format(new Date()));
+
+                assert job != null;
+                String name = " #" + job.getNextBuildNumber();
+                BitBucketPushCause cause;
                 try {
-                    StreamTaskListener listener = new StreamTaskListener(getLogFile());
-
-                    try {
-                        PrintStream logger = listener.getLogger();
-                        long start = System.currentTimeMillis();
-                        logger.println("Started on " + DateFormat.getDateTimeInstance().format(new Date()));
-                        boolean result = SCMTriggerItem.SCMTriggerItems.asSCMTriggerItem(job).poll(listener).hasChanges();
-
-                        logger.println("Done. Took " + Util.getTimeSpanString(System.currentTimeMillis() - start));
-                        if (result)
-                            logger.println("Changes found");
-                        else
-                            logger.println("No changes");
-                    } catch (Error | Exception e) {
-                        e.printStackTrace(listener.error("Failed to record SCM polling"));
-                        LOGGER.log(Level.SEVERE, "Failed to record SCM polling", e);
-                        throw e;
-                    } finally {
-                        listener.close();
-                    }
+                    cause = new BitBucketPushCause(getLogFile(), pushBy);
                 } catch (IOException e) {
-                    LOGGER.log(Level.SEVERE, "Failed to record SCM polling", e);
+                    LOGGER.log(Level.WARNING, "Failed to parse the polling log", e);
+                    cause = new BitBucketPushCause(pushBy);
                 }
-                return true;
-            }
-
-            public void run() {
-                try {
-                    runPolling();
-                    assert job != null;
-                    String name = " #" + job.getNextBuildNumber();
-                    BitBucketPushCause cause;
-                    try {
-                        cause = new BitBucketPushCause(getLogFile(), pushBy);
-                    } catch (IOException e) {
-                        LOGGER.log(Level.WARNING, "Failed to parse the polling log", e);
-                        cause = new BitBucketPushCause(pushBy);
+                ParameterizedJobMixIn pJob = new ParameterizedJobMixIn() {
+                    @Override
+                    protected Job asJob() {
+                        return job;
                     }
-                    ParameterizedJobMixIn pJob = new ParameterizedJobMixIn() {
-                        @Override
-                        protected Job asJob() {
-                            return job;
-                        }
-                    };
-                    BitBucketPayload bitBucketPayload = new BitBucketPayload(payload);
-                    LOGGER.info("Schedule " + job.getName());
-                    QueueTaskFuture queueTaskFuture = pJob.scheduleBuild2(5, new CauseAction(cause), bitBucketPayload);
-                    assert queueTaskFuture != null;
-                    if (pJob.scheduleBuild(cause)) {
-                        LOGGER.info("SCM changes detected in " + job.getName() + ". Triggering " + name);
-                    } else {
-                        LOGGER.info("SCM changes detected in " + job.getName() + ". Job is already in the queue");
-                    }
-                    queueTaskFuture.waitForStart();
-                } catch (InterruptedException | ExecutionException e) {
-                    e.printStackTrace();
+                };
+                BitBucketPayload bitBucketPayload = new BitBucketPayload(payload);
+                LOGGER.info("Schedule " + job.getName());
+                currentTask.set(pJob.scheduleBuild2(0, new CauseAction(cause), bitBucketPayload));
+                if (pJob.scheduleBuild(cause)) {
+                    LOGGER.info("SCM changes detected in " + job.getName() + ". Triggering " + name);
+                } else {
+                    LOGGER.info("SCM changes detected in " + job.getName() + ". Job is already in the queue");
                 }
+                logger.println("Done. Took " + Util.getTimeSpanString(System.currentTimeMillis() - start));
+            } catch (IOException e) {
+                LOGGER.log(Level.SEVERE, "Failed to record SCM polling", e);
             }
-
         });
+        return currentTask.get();
     }
 
     @Override

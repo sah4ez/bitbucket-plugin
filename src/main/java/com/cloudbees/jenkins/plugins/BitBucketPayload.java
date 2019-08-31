@@ -27,6 +27,13 @@ public class BitBucketPayload extends InvisibleAction implements EnvironmentCont
         return payload;
     }
 
+    /**
+     *
+     * @param abstractBuild
+     * @param envVars
+     * prepare environment variables from BITBUCKET_PAYLOAD
+     * extract REPOSITORY name, AUTHOR changes and BRANCH
+     */
     @Override
     public void buildEnvVars(AbstractBuild<?, ?> abstractBuild, EnvVars envVars) {
         final String payload = getPayload();

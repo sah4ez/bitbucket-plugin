@@ -1,6 +1,7 @@
 package com.cloudbees.jenkins.plugins;
 
 import hudson.model.Job;
+import hudson.model.queue.QueueTaskFuture;
 import hudson.plugins.git.GitSCM;
 import hudson.plugins.git.GitStatus;
 import hudson.plugins.mercurial.MercurialSCM;
@@ -9,7 +10,6 @@ import hudson.security.ACL;
 
 import java.net.URISyntaxException;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -18,7 +18,6 @@ import hudson.triggers.Trigger;
 import jenkins.model.Jenkins;
 
 import jenkins.model.ParameterizedJobMixIn;
-import jenkins.triggers.SCMTriggerItem;
 import org.acegisecurity.context.SecurityContext;
 import org.acegisecurity.context.SecurityContextHolder;
 import org.apache.commons.lang.StringUtils;
@@ -29,14 +28,14 @@ import com.google.common.base.Objects;
 public class BitbucketJobProbe {
 
     private static final String RONTE_JOB_NAME = "platoon-backend-multijob";
-    private static final String syncPost = "sync";
 
     @Deprecated
-    public void triggerMatchingJobs(String user, String url, String scm) {
-        triggerMatchingJobs(user, url, scm, "");
+    public QueueTaskFuture triggerMatchingJob(String user, String url, String scm) {
+        return triggerMatchingJob(user, url, scm, "");
     }
 
-    public void triggerMatchingJobs(String user, String url, String scm, String payload) {
+    public QueueTaskFuture triggerMatchingJob(String user, String url, String scm, String payload) {
+        QueueTaskFuture currentTask = null;
         if ("git".equals(scm) || "hg".equals(scm)) {
             SecurityContext old = Jenkins.getInstance().getACL().impersonate(ACL.SYSTEM);
             try {
@@ -48,7 +47,7 @@ public class BitbucketJobProbe {
                 Job job = Jenkins.getInstance().getItemByFullName(fullName, Job.class);
                 if (job == null) {
                     LOGGER.log(Level.WARNING, "{0} hasn't BitBucketTrigger set {1}", fullName);
-                    return;
+                    return currentTask;
                 }
                 if (job instanceof ParameterizedJobMixIn.ParameterizedJob) {
                     ParameterizedJobMixIn.ParameterizedJob pJob = (ParameterizedJobMixIn.ParameterizedJob) job;
@@ -63,7 +62,7 @@ public class BitbucketJobProbe {
 
                 if (bTrigger != null) {
                     LOGGER.log(Level.INFO, "Considering to poke {0}", job.getFullDisplayName());
-                    bTrigger.onPost(user, payload);
+                    currentTask = bTrigger.onPost(user, payload);
                 } else {
                     LOGGER.log(Level.INFO, "{0} hasn't BitBucketTrigger set", job.getName());
                 }
@@ -77,6 +76,7 @@ public class BitbucketJobProbe {
         } else {
             throw new UnsupportedOperationException("Unsupported SCM type " + scm);
         }
+        return currentTask;
     }
 
     private boolean hasBeenTriggered(List<SCM> scmTriggered, SCM scmTrigger) {

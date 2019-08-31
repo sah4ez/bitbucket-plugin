@@ -3,7 +3,6 @@ package com.cloudbees.jenkins.plugins;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -12,10 +11,7 @@ import javax.servlet.http.HttpServletRequest;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
-import org.apache.sshd.common.util.IoUtils;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -62,11 +58,11 @@ public class BitbucketPayloadProcessorTest {
 
         payloadProcessor.processPayload(payload, request);
 
-        verify(probe).triggerMatchingJobs(user, url, "git", payload.toString());
+        verify(probe).triggerMatchingJob(user, url, "git", payload.toString());
 
         payloadProcessor.processPayload(hgLoad, request);
 
-        verify(probe).triggerMatchingJobs(user, url, "hg", hgLoad.toString());
+        verify(probe).triggerMatchingJob(user, url, "hg", hgLoad.toString());
     }
 
     @Test
@@ -92,7 +88,7 @@ public class BitbucketPayloadProcessorTest {
 
         payloadProcessor.processPayload(payload, request);
 
-        verify(probe).triggerMatchingJobs(user, url, "git", payload.toString());
+        verify(probe).triggerMatchingJob(user, url, "git", payload.toString());
     }
 
     @Test
@@ -109,7 +105,7 @@ public class BitbucketPayloadProcessorTest {
 
         payloadProcessor.processPayload(payload, request);
 
-        verify(probe).triggerMatchingJobs("old_user", "https://staging.bitbucket.org/old_user/old_repo", "git", payload.toString());
+        verify(probe).triggerMatchingJob("old_user", "https://staging.bitbucket.org/old_user/old_repo", "git", payload.toString());
     }
     
     
@@ -122,7 +118,7 @@ public class BitbucketPayloadProcessorTest {
         	JSONObject payload = JSONObject.fromObject(IOUtils.toString(input));
             payloadProcessor.processPayload(payload, request);
             
-            verify(probe).triggerMatchingJobs(user, url, "git", payload.toString());
+            verify(probe).triggerMatchingJob(user, url, "git", payload.toString());
         }
         
     }
@@ -136,7 +132,7 @@ public class BitbucketPayloadProcessorTest {
         	JSONObject payload = JSONObject.fromObject(IOUtils.toString(input));
             payloadProcessor.processPayload(payload, request);
             
-            verify(probe).triggerMatchingJobs(user, url, "git", payload.toString());
+            verify(probe).triggerMatchingJob(user, url, "git", payload.toString());
         }
     }
 
@@ -168,10 +164,10 @@ public class BitbucketPayloadProcessorTest {
 
         payloadProcessor.processPayload(payload, request);
 
-        verify(probe).triggerMatchingJobs(user, url, "git", payload.toString());
+        verify(probe).triggerMatchingJob(user, url, "git", payload.toString());
 
         payloadProcessor.processPayload(hgLoad, request);
 
-        verify(probe).triggerMatchingJobs(user, url, "hg", hgLoad.toString());
+        verify(probe).triggerMatchingJob(user, url, "hg", hgLoad.toString());
     }
 }
