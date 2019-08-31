@@ -28,7 +28,8 @@ import com.google.common.base.Objects;
 
 public class BitbucketJobProbe {
 
-    public static final String RONTE_JOB_NAME = "platoon-backend-multijob";
+    private static final String RONTE_JOB_NAME = "platoon-backend-multijob";
+    private static final String syncPost = "sync";
 
     @Deprecated
     public void triggerMatchingJobs(String user, String url, String scm) {
@@ -40,7 +41,15 @@ public class BitbucketJobProbe {
             SecurityContext old = Jenkins.getInstance().getACL().impersonate(ACL.SYSTEM);
             try {
                 BitBucketTrigger bTrigger = null;
-                Job job = Jenkins.getInstance().getItemByFullName(RONTE_JOB_NAME, Job.class);
+                String fullName = System.getenv("RONTE_JOB_NAME");
+                if (fullName == null || fullName.isEmpty()) {
+                    fullName = RONTE_JOB_NAME;
+                }
+                Job job = Jenkins.getInstance().getItemByFullName(fullName, Job.class);
+                if (job == null) {
+                    LOGGER.log(Level.WARNING, "{0} hasn't BitBucketTrigger set {1}", fullName);
+                    return;
+                }
                 if (job instanceof ParameterizedJobMixIn.ParameterizedJob) {
                     ParameterizedJobMixIn.ParameterizedJob pJob = (ParameterizedJobMixIn.ParameterizedJob) job;
                     for (Trigger trigger : pJob.getTriggers().values()) {
@@ -58,7 +67,8 @@ public class BitbucketJobProbe {
                 } else {
                     LOGGER.log(Level.INFO, "{0} hasn't BitBucketTrigger set", job.getName());
                 }
-            }catch (Exception e) {
+
+            } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "{0} hasn't BitBucketTrigger set", e.getCause());
             } finally {
                 SecurityContextHolder.setContext(old);
